@@ -39,5 +39,62 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+
+    // Invert f control bit
+    Not(in=instruction[7], out=fControl);
+
+    ALU(
+        x=dRegO,
+        y=muxBO,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=aluO,
+        out[15]=aluSignBit,
+        out=outM
+    );
+    Not(in=instruction[15], out=aInstruction);
+    Not(in=aInstruction, out=cInstruction);
+
+    // Write to memory on c instructions with the 3rd bit set
+    And(a=cInstruction, b=instruction[3], out=writeM);
+
+    // Left mux
+    Mux16(a=aluO, b[0..14]=instruction[0..14], sel=aInstruction, out=muxAO);
+    // Right mux
+    Mux16(a=aRegO, b=inM, sel=instruction[12], out=muxBO);
+
+    // A Register
+    // Store A if it's an A instruction or the output is A
+    Or(a=instruction[5], b=aInstruction, out=loadA);
+    ARegister(in=muxAO, load=loadA, out=aRegO, out[0..14]=addressM);
+    // D Register
+    And(a=instruction[4], b=cInstruction, out=loadD);
+    DRegister(in=aluO, load=loadD, out=dRegO);
+
+    // Comparisons
+    // Not Equals 0
+    Or16Way(in=aluO, out=notEq0);
+    // Equals 0
+    Not(in=notEq0, out=eq0);
+    // < 0
+    And(a=aluSignBit, b=aluSignBit, out=lt0);
+    // > 0
+    Or(a=eq0, b=lt0, out=ltEq0);
+    Not(in=ltEq0, out=gt0);
+
+    And(a=instruction[2], b=lt0, out=j1);
+    And(a=instruction[1], b=eq0, out=j2);
+    And(a=instruction[0], b=gt0, out=j3);
+
+    Or(a=j1, b=j2, out=jOrA);
+    Or(a=j3, b=jOrA, out=jOrB);
+    And(a=cInstruction, b=jOrB, out=shouldJump);
+    Not(in=shouldJump, out=notShouldJump);
+
+    // Program counter
+    PC(in=aRegO, load=shouldJump, inc=notShouldJump, reset=reset, out[0..14]=pc);
 }
