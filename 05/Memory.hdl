@@ -27,5 +27,33 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    Not(in=address[14], out=not14);
+    Not(in=address[13], out=not13);
+
+    // Main memory
+    And(a=not14, b=not13, out=not13AndNot14);
+    And(a=not14, b=address[13], out=not13Only);
+    Or(a=not13AndNot14, b=not13Only, out=mainMemSelected);
+    And(a=mainMemSelected, b=load, out=writeMainMem);
+    RAM16K(in=in, load=writeMainMem, address=address[0..13], out=mainMemOut);
+
+    // Screen mmap
+    And(a=address[14], b=not13, out=screenSelected);
+    And(a=screenSelected, b=load, out=writeScreen);
+    Screen(in=in, load=writeScreen, address=address[0..12], out=screenOut);
+
+    // Keyboard mmap
+    And(a=address[14], b=address[13], out=keySelected);
+    Keyboard(out=keyOut);
+
+    // Memselect Mux
+    Mux4Way16(
+        a=mainMemOut,
+        b=keyOut,
+        c=screenOut,
+        d=false,
+        sel[0]=keySelected,
+        sel[1]=screenSelected,
+        out=out
+    );
 }
